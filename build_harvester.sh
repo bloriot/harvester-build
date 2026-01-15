@@ -4,7 +4,7 @@
 # Harvester Build Automation Script
 #
 # This script automates the setup and build process for Harvester ISO and QCOW images.
-# It supports SUSE Linux Enterprise Server (SLES) and Ubuntu.
+# It supports SLES, Ubuntu, and Debian.
 #
 # Reference: https://github.com/harvester/harvester/wiki/Build-OCI-and-ISO-images
 # ==============================================================================
@@ -69,7 +69,6 @@ install_sles_deps() {
     systemctl enable --now docker
 
     # 3. Install KVM virtualization patterns if building a QCOW image
-    # This is required for the raw image build process
     if [ "$BUILD_QCOW" == "true" ]; then
         log "QCOW build requested. Installing KVM server pattern..."
         zypper in -y -t pattern kvm_server
@@ -81,10 +80,9 @@ install_ubuntu_deps() {
 
     # 1. Install basic build tools
     apt-get update
-    apt-get install -y git make ca-certificates curl
+    apt-get install -y git make ca-certificates curl gnupg
 
     # 2. Setup Official Docker Repository
-    # This ensures we get the latest supported version of Docker
     install -m 0755 -d /etc/apt/keyrings
     curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
     chmod a+r /etc/apt/keyrings/docker.asc
@@ -100,8 +98,53 @@ install_ubuntu_deps() {
     apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
     # 4. Configure Docker Daemon
-    # Harvester build on Ubuntu specifically requires min-api-version 1.42
+    _configure_docker_daemon
+
+    # 5. Install QEMU/KVM tools if building a QCOW image
+    if [ "$BUILD_QCOW" == "true" ]; then
+        log "QCOW build requested. Installing QEMU, OVMF, and utils..."
+        apt-get install -y qemu-system-x86 ovmf qemu-utils
+    fi
+}
+
+install_debian_deps() {
+    log "Detected OS: Debian. Beginning dependency installation..."
+
+    # 1. Install basic build tools
+    # Ensure gnupg is installed for key handling
+    apt-get update
+    apt-get install -y git make ca-certificates curl gnupg
+
+    # 2. Setup Official Docker Repository (Debian specific URL)
+    install -m 0755 -d /etc/apt/keyrings
+    # Note: URL is linux/debian here
+    curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
+    chmod a+r /etc/apt/keyrings/docker.asc
+
+    echo \
+      "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian \
+      $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+      tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+    apt-get update
+
+    # 3. Install Docker Engine and plugins
+    apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+    # 4. Configure Docker Daemon
+    _configure_docker_daemon
+
+    # 5. Install QEMU/KVM tools if building a QCOW image
+    if [ "$BUILD_QCOW" == "true" ]; then
+        log "QCOW build requested. Installing QEMU, OVMF, and utils..."
+        apt-get install -y qemu-system-x86 ovmf qemu-utils
+    fi
+}
+
+# Helper to apply common Docker configurations for Debian/Ubuntu
+_configure_docker_daemon() {
     log "Configuring /etc/docker/daemon.json for API compatibility..."
+    mkdir -p /etc/docker
     tee /etc/docker/daemon.json <<EOF
 {
   "min-api-version": "1.42"
@@ -109,12 +152,6 @@ install_ubuntu_deps() {
 EOF
     # Restart Docker to apply the daemon.json changes
     systemctl enable --now docker
-
-    # 5. Install QEMU/KVM tools if building a QCOW image
-    if [ "$BUILD_QCOW" == "true" ]; then
-        log "QCOW build requested. Installing QEMU, OVMF, and utils..."
-        apt-get install -y qemu-system-x86 ovmf qemu-utils
-    fi
 }
 
 # ------------------------------------------------------------------------------
@@ -132,8 +169,11 @@ prepare_environment() {
             ubuntu)
                 install_ubuntu_deps
                 ;;
+            debian)
+                install_debian_deps
+                ;;
             *)
-                error "Unsupported OS detected: $ID. This script strictly supports SLES and Ubuntu."
+                error "Unsupported OS detected: $ID. This script strictly supports SLES, Ubuntu, and Debian."
                 ;;
         esac
     else
