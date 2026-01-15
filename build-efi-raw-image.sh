@@ -251,7 +251,7 @@ QEMU_CMD="$QEMU_CMD -kernel ${KERNEL_FILE}"
 # - harvester.install.automatic=true: No user interaction required
 # - harvester.install.powerOff=true: Shutdown VM immediately after success
 # - console=ttyS1: Redirect logs to serial port for capture
-CMDLINE="cdroot root=live:CDLABEL=COS_LIVE rd.live.dir=/ rd.live.ram=1 rd.live.squashimg=rootfs.squashfs console=ttyS1 rd.cos.disable net.ifnames=1 harvester.install.mode=install harvester.install.device=/dev/vda harvester.install.automatic=true harvester.install.powerOff=true harvester.os.password=rancher harvester.scheme_version=1 harvester.install.persistentPartitionSize=150Gi harvester.install.skipchecks=true"
+CMDLINE="cdroot root=live:CDLABEL=COS_LIVE rd.live.dir=/ rd.live.squashimg=rootfs.squashfs console=ttyS1 rd.cos.disable net.ifnames=1 harvester.install.mode=install harvester.install.device=/dev/vda harvester.install.automatic=true harvester.install.powerOff=true harvester.os.password=rancher harvester.scheme_version=1 harvester.install.persistentPartitionSize=150Gi harvester.install.skipchecks=true"
 
 QEMU_CMD="$QEMU_CMD -append \"$CMDLINE\""
 QEMU_CMD="$QEMU_CMD -initrd ${INITRD_FILE} -boot once=d"
