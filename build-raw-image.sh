@@ -3,25 +3,6 @@
 # Script: build-raw-image.sh
 # Description: Create a raw disk image with EFI/BIOS boot for Harvester
 # ============================================================================
-# This script automates the creation of a raw disk image pre-installed with
-# Harvester, configured for either EFI/UEFI or BIOS boot.
-#
-# Features:
-# - Support for EFI (default) or Legacy BIOS boot
-# - Output formats: Compressed Raw (zstd) or QCOW2
-# - Custom artifact directory support
-# - Automatic version detection from ISO files
-# - Automatic OVMF (UEFI) firmware detection
-# - Creation of a QEMU VM with selected boot mode
-# - Automatic installation of Harvester
-#
-# Prerequisites:
-# - Harvester ISO already built (via 'make')
-# - QEMU installed (qemu-system-x86_64)
-# - OVMF installed (for EFI mode)
-# - KVM enabled and accessible by the user
-# - zstd installed (for raw compression)
-# ============================================================================
 
 # Strict mode: stop the script on the first error
 set -e
@@ -36,7 +17,7 @@ ARTIFACTS_DIR="harvester-build/harvester-installer/dist/artifacts" # Default pat
 VM_MEMORY=8192
 
 # Default Settings (can be overridden by flags)
-BOOT_MODE="efi"     # Options: efi, bios
+BOOT_MODE="efi"         # Options: efi, bios
 OUTPUT_FORMAT="raw-zst" # Options: raw-zst, qcow2
 
 # ============================================================================
@@ -53,7 +34,7 @@ usage() {
     echo "  -b, --boot-mode [efi|bios]   Set boot mode (default: efi)"
     echo "  -f, --format [raw-zst|qcow2] Set output format (default: raw-zst)"
     echo "  -v, --version [VERSION]      Set specific version (auto-detected if empty)"
-    echo "  -d, --dir [DIRECTORY]        Set artifacts directory (default: ./harvester-build/harvester-installer/dist/artifacts)"
+    echo "  -d, --dir [DIRECTORY]        Set artifacts directory"
     echo "  -h, --help                   Show this help message"
     exit 0
 }
@@ -125,13 +106,16 @@ fi
 # Step 2: Version Detection & File Paths
 # ============================================================================
 if [ -z "$VERSION" ]; then
-  ISO_FILE=$(ls -t "${ARTIFACTS_DIR}/harvester-*-${ARCH}.iso" 2>/dev/null | head -1)
+  # FIX: Wildcard * must be OUTSIDE quotes to expand correctly
+  ISO_FILE=$(ls -t "${ARTIFACTS_DIR}"/harvester-*-"${ARCH}".iso 2>/dev/null | head -1)
+  
   if [ -n "$ISO_FILE" ]; then
+    # Extract version: harvester-(v1.7.0)-amd64.iso
     VERSION=$(basename "$ISO_FILE" | sed "s/harvester-\(.*\)-${ARCH}\.iso/\1/")
     PROJECT_PREFIX="harvester-${VERSION}"
     log "Auto-detected version: $VERSION"
   else
-    error "Could not find ISO file in ${ARTIFACTS_DIR}/."
+    error "Could not find ISO file in ${ARTIFACTS_DIR}/ matching pattern 'harvester-*-${ARCH}.iso'"
   fi
 else
   PROJECT_PREFIX="harvester-${VERSION}"
@@ -199,6 +183,7 @@ RAW_FILE="${ARTIFACTS_DIR}/${PROJECT_PREFIX}-${ARCH}.raw"
 
 if [ -f "$RAW_FILE" ]; then rm -f "$RAW_FILE"; fi
 
+# Create sparse file
 qemu-img create -f raw -o size=250G "$RAW_FILE"
 
 HOST_RAM_KB=$(grep MemTotal /proc/meminfo | awk '{print $2}')
@@ -225,11 +210,12 @@ QEMU_CMD="$QEMU_CMD -drive file=${RAW_FILE},if=virtio,cache=writeback,discard=ig
 QEMU_CMD="$QEMU_CMD -cdrom ${ISO_FILE} -kernel ${KERNEL_FILE}"
 
 # Using CDLABEL=COS_LIVE to ensure the ISO is found regardless of the boot device name
+# NOTE: rd.live.squashimg=rootfs.squashfs directs it to look for the squashfs file inside the ISO
 CMDLINE="cdroot root=live:CDLABEL=COS_LIVE rd.live.dir=/ rd.live.squashimg=rootfs.squashfs console=ttyS1 rd.cos.disable net.ifnames=1 harvester.install.mode=install harvester.install.device=/dev/vda harvester.install.automatic=true harvester.install.powerOff=true harvester.os.password=rancher harvester.scheme_version=1 harvester.install.persistentPartitionSize=150Gi harvester.install.skipchecks=true"
 
 QEMU_CMD="$QEMU_CMD -append \"$CMDLINE\" -initrd ${INITRD_FILE} -boot once=d"
 
-echo "  Running installation..."
+echo "  Running installation (Check harvester-installer.log for details)..."
 eval $QEMU_CMD
 
 # ============================================================================
