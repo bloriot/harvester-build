@@ -43,12 +43,12 @@ echo "🛠️  Applying patch to ALL providers lines..."
 # ([[:space:]]*) : Capture group 1 -> Matches all leading spaces
 # providers:.* : Matches the key and everything after it
 # \1  : Puts back the captured spaces from group 1 (Preserves indentation)
-sudo sed -E -i 's/^([[:space:]]*)providers:.*$/\1providers: ["nocloud", "configdrive", "openstack", "cdrom"]/' "$CONFIG_PATH"
+sudo sed -E -i 's/^([[:space:]]*)providers:.*$/\1providers: ["nocloud", "config-drive", "openstack", "cdrom"]/' "$CONFIG_PATH"
 
 # 5. Verify changes
 echo "🔎 Verifying changes..."
-# We expect multiple matches now containing 'configdrive'
-MATCH_COUNT=$(grep -c "configdrive" "$CONFIG_PATH")
+# We expect multiple matches now containing 'config-drive'
+MATCH_COUNT=$(grep -c "config-drive" "$CONFIG_PATH")
 
 if [ "$MATCH_COUNT" -ge 2 ]; then
     echo "   ✅ Success: Updated $MATCH_COUNT locations."
