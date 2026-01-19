@@ -1,2 +1,5 @@
 harvester-installer.log
 harvester-v*-artifacts
+*.iso
+*.log
+*.qcow2
