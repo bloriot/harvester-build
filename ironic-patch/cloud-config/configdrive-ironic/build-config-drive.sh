@@ -1,0 +1,72 @@
+mkdir -p my-config/openstack/latest
+
+cat <<EOF > my-config/openstack/latest/user_data
+#cloud-config
+scheme_version: 1
+
+# The secret token shared by all nodes in the cluster.
+# Required for other nodes to join this cluster later.
+token: "my-secret-token"
+
+os:
+  # The unique hostname for this specific node.
+  hostname: harvester-node-01
+
+  # The password for the default 'rancher' user (used for console/SSH access).
+  password: "password123"
+
+  # Network Time Protocol servers to ensure cluster synchronization.
+  ntp_servers:
+    - 0.suse.pool.ntp.org
+    - 1.suse.pool.ntp.org
+
+  # Public SSH keys allowed to log in as the 'rancher' user.
+  ssh_authorized_keys:
+    - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCn2ICnMAAN30uiSXhmYmHTx0JNZzeGpPnw4+5glkp088orRlWsMg5g7rWFMG94KD6YcJvhoFKf7v+bYM5ZU+H7p5C7JwafRuxwRR0Z++jUNMkfLwDEbrbNZp3y9sTLDJDBEICE0mzv2pvZIQU6M/r6va1j1FST8R5y2ZcpmoL9Kz4heTJ7wvDzhrpqOd4Ac3VJmyUadJ9TS/B+pdZksbamuss1G6eb7k+7lKprcrHO4+G1SR2R9zHGYoBcJUhS09V5vBdDra/Q1GAeRpPy0vkZJh0IkTmyKJ4wdKjFpxjonEuQMZCTOonLn74xzepTAc7TeFcJ9S85c/gw7HOBA19r rsa-key-zbox-bloriot
+
+install:
+  # 'create' initializes a new cluster. Use 'join' for subsequent nodes.
+  mode: create
+
+  # Run installer  without asking for interactive confirmation.
+  automatic: true
+
+  # Defines how this node connects to the network.
+  management_interface:
+    # The list of physical interfaces to use for the management network.
+    interfaces:
+      - name: enp1s0
+
+    # Ensure this interface is used as the default gateway for the OS.
+    default_route: true
+
+    # Network configuration method: 'static' or 'dhcp'.
+    method: static
+
+    # Static IP details for THIS specific node.
+    ip: 10.6.110.101
+    subnet_mask: 255.255.255.0
+    gateway: 10.6.110.1
+
+    # Link Aggregation settings. Harvester creates a bond interface even for a single NIC.
+    bond_options:
+      mode: balance-tlb
+      miimon: 100
+
+  # The Virtual IP (Floating IP) for accessing the Harvester Dashboard/API.
+  # This IP floats between control plane nodes if one goes down.
+  vip: 10.6.110.100
+  vip_mode: static
+EOF
+
+cat <<EOF > my-config/openstack/latest/meta_data.json
+{
+    "uuid": "$(uuidgen)",
+    "hostname": "harvester-test-ironic",
+}
+EOF
+
+genisoimage -output config-drive.iso \
+  -volid config-2 \
+  -joliet -rock \
+  my-config
