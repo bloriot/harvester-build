@@ -91,7 +91,6 @@ xorriso -indev "$INPUT_ISO" \
         -outdev "$OUTPUT_ISO" \
         -boot_image any replay \
         -map modified_rootfs.squashfs /rootfs.squashfs \
-        -volid "HARVESTER_MOD" \
         -padding 0 \
         -compliance no_emul_toc \
         2>/dev/null
