@@ -8,7 +8,7 @@
 set -e
 
 # --- Configuration ---
-INPUT_FILE="${1:-harvester-config}"
+INPUT_FILE="${1:-harvester-config.yaml}"
 OUTPUT_ISO="${2:-config-drive.iso}"
 WORK_DIR="config-drive-build"
 LABEL="config-2"  # STRICT REQUIREMENT for Ironic/Cloud-Init logic

@@ -8,7 +8,7 @@
 set -e
 
 # --- Configuration ---
-INPUT_FILE="${1:-harvester-config}"
+INPUT_FILE="${1:-harvester-config.yaml}"
 OUTPUT_ISO="${2:-nocloud-drive.iso}"
 WORK_DIR="nocloud-build"
 LABEL="CIDATA"  # STRICT REQUIREMENT for NoCloud datasource
