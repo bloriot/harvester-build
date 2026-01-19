@@ -12,6 +12,11 @@ os:
   # The password for the default 'rancher' user (used for console/SSH access).
   password: "password123"
 
+  # DNS name servers to use
+  dns_nameservers:
+    - 8.8.8.8
+    - 1.1.1.1
+
   # Network Time Protocol servers to ensure cluster synchronization.
   ntp_servers:
     - 0.suse.pool.ntp.org

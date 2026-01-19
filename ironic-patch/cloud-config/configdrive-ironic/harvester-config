@@ -1,6 +1,3 @@
-mkdir -p my-config/openstack/latest
-
-cat <<EOF > my-config/openstack/latest/user_data
 #cloud-config
 scheme_version: 1
 
@@ -14,6 +11,11 @@ os:
 
   # The password for the default 'rancher' user (used for console/SSH access).
   password: "password123"
+
+  # DNS name servers to use
+  dns_nameservers:
+    - 8.8.8.8
+    - 1.1.1.1
 
   # Network Time Protocol servers to ensure cluster synchronization.
   ntp_servers:
@@ -57,16 +59,3 @@ install:
   # This IP floats between control plane nodes if one goes down.
   vip: 10.6.110.100
   vip_mode: static
-EOF
-
-cat <<EOF > my-config/openstack/latest/meta_data.json
-{
-    "uuid": "$(uuidgen)",
-    "hostname": "harvester-test-ironic",
-}
-EOF
-
-genisoimage -output config-drive.iso \
-  -volid config-2 \
-  -joliet -rock \
-  my-config
