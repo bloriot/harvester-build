@@ -18,7 +18,6 @@ echo "🔧 Processing: $INPUT_ISO"
 
 # 1. Extract rootfs.squashfs
 echo "📦 Extracting rootfs.squashfs..."
-# We explicitly extract the file you identified
 xorriso -osirrox on -indev "$INPUT_ISO" -extract /rootfs.squashfs original_rootfs.squashfs 2>/dev/null
 
 if [ ! -f "original_rootfs.squashfs" ]; then
@@ -62,11 +61,11 @@ stages:
              
              # Copy user_data to where Harvester expects it (/oem)
              if [ -f "/tmp/ironic_config/openstack/latest/user_data" ]; then
-                cp /tmp/ironic_config/openstack/latest/user_data /oem/99_ironic.yaml
-                chmod 600 /oem/99_ironic.yaml
+                cp /tmp/ironic_config/openstack/latest/user_data /oem/userdata.yaml
+                chmod 600 /oem/userdata.yaml
              elif [ -f "/tmp/ironic_config/user_data" ]; then
-                cp /tmp/ironic_config/user_data /oem/99_ironic.yaml
-                chmod 600 /oem/99_ironic.yaml
+                cp /tmp/ironic_config/user_data /oem/userdata.yaml
+                chmod 600 /oem/userdata.yaml
              fi
              umount /tmp/ironic_config
           fi
@@ -84,7 +83,6 @@ xorriso -indev "$INPUT_ISO" \
         -outdev "$OUTPUT_ISO" \
         -boot_image any replay \
         -map modified_rootfs.squashfs /rootfs.squashfs \
-        -volid "HARVESTER_IRONIC" \
         -padding 0 \
         -compliance no_emul_toc \
         2>/dev/null
