@@ -14,7 +14,25 @@ This toolkit provides scripts to build bootable Harvester raw disk image (or QCO
 
 ---
 
-## 1. Build Raw/QCOW2 Image
+## 1. Patch ISO for Ironic Support
+
+Standard Harvester does not support the Ironic `config-2` label. Use this script to inject a hook into the ISO's `rootfs.squashfs` that bridges `config-2` to Harvester's cloud-init compatibility layer.
+
+**Usage:**
+
+```bash
+sudo ./patch_harvester_iso_ironic_hook.sh <input_iso> [output_iso]
+```
+
+**Example:**
+
+```bash
+sudo ./patch_harvester_iso.sh harvester-v1.7.0.iso harvester-ironic.iso
+```
+
+---
+
+## 2. Build Raw/QCOW2 Image
 
 Use this if you need a pre-installed disk image instead of an installer ISO (e.g., for direct KVM/QEMU booting).
 
@@ -33,31 +51,12 @@ sudo ./build-raw-image.sh [options]
 **Example:**
 
 ```bash
-# Create a BIOS-bootable QCOW2 image
+# Create a EFI-bootable QCOW2 image
 sudo ./build-raw-image.sh -b efi -f qcow2 -d harvester-v1.7.0-artifacts
 ```
-
 ---
 
-## 2. Patch ISO for Ironic Support
-
-Standard Harvester does not support the Ironic `config-2` label. Use this script to inject a hook into the ISO's `rootfs.squashfs` that bridges `config-2` to Harvester's cloud-init compatibility layer.
-
-**Usage:**
-
-```bash
-sudo ./patch_harvester_iso.sh <input_iso> [output_iso]
-```
-
-**Example:**
-
-```bash
-sudo ./patch_harvester_iso.sh harvester-v1.7.0.iso harvester-ironic.iso
-```
-
----
-
-## 3. Generate Configuration Drives
+## 3. Generate Configuration Drives (for testing)
 
 These scripts convert a simple YAML Harvester configuration file into a bootable ISO.
 
