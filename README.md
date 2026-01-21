@@ -14,11 +14,11 @@ Ensure you have the required tools installed.
 * **Debian/Ubuntu:**
     ```bash
     sudo apt update
-    sudo apt install curl xorriso squashfs-tools qemu-utils qemu-system-x86 make
+    sudo apt install curl xorriso squashfs-tools qemu-utils qemu-system-x86 ovmf make
     ```
 * **RHEL/CentOS/Fedora:**
     ```bash
-    sudo dnf install curl xorriso squashfs-tools qemu-img qemu-system-x86 make
+    sudo dnf install curl xorriso squashfs-tools qemu-img qemu-system-x86 ovmf make
     ```
 
 ### 2. Build a Standard Image
