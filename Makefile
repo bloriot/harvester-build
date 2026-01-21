@@ -92,6 +92,7 @@ clean:
 	@echo "🧹 Cleaning up staging and artifacts..."
 	rm -rf $(STAGING_DIR)
 	rm -rf $(DOWNLOAD_DIR)
+    rm -rf harvester-installer.log
 
 help:
 	@echo "Usage: make [target] [variables]"
