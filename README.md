@@ -1,79 +1,91 @@
-# Harvester Build & Config Toolkit
+# Harvester Image Builder
 
-This toolkit provides scripts to build bootable Harvester raw disk image (or QCOW2) for direct VM deployment, patch Harvester ISO for OpenStack Ironic support, and generate compatible configuration drives.
+A toolkit for automating the creation of custom [Harvester](https://harvesterhci.io/) disk images.
 
-## Scripts Overview
+This repository provides scripts and a Makefile to:
+1.  **Download** official Harvester artifacts (ISO, Kernel, Initrd).
+2.  **Patch** the ISO to inject custom hooks (e.g., for OpenStack Ironic ConfigDrive support).
+3.  **Build** bootable raw or QCOW2 disk images for direct VM deployment.
 
-| Script | Purpose |
-| --- | --- |
-| **`download-harvester-artefacts.sh`** | Download the Harvester artefacts (ISO, vmlinuz, initrd, rootfs...). |
-| **`build-raw-image.sh`** | Converts the Harvester ISO into a bootable raw disk image (or QCOW2) for direct VM deployment. |
-| **`ironic-patch/patch_harvester_iso_ironic_hook.sh`** | Patches the Harvester ISO to support **Ironic ConfigDrive** (label `config-2`) by injecting a compatibility hook. |
-| **`cloud-config/build-configdrive.sh`** | Generates an **Ironic-compatible** ISO (Label: `config-2`) containing your Harvester configuration. |
-| **`cloud-config/build-nocloud.sh`** | Generates a **Standard NoCloud** ISO (Label: `CIDATA`) containing your Harvester configuration. |
+## 🚀 Quick Start
+
+### 1. Prerequisites
+Ensure you have the required tools installed.
+* **Debian/Ubuntu:**
+    ```bash
+    sudo apt update
+    sudo apt install curl xorriso squashfs-tools qemu-utils qemu-system-x86 make
+    ```
+* **RHEL/CentOS/Fedora:**
+    ```bash
+    sudo dnf install curl xorriso squashfs-tools qemu-img qemu-system-x86 make
+    ```
+
+### 2. Build a Standard Image
+To download the latest Harvester ISO and convert it to a bootable QCOW2 image:
+
+```bash
+make
+```
+
+### 3. Build an Ironic-Compatible Image
+
+To inject the **Ironic ConfigDrive Hook** (required for OpenStack Ironic deployments using `config-2` labels):
+
+```bash
+make PATCH_IRONIC=true
+```
 
 ---
 
-## 1. Patch ISO for Ironic Support
+## ⚙️ Configuration Variables
 
-Standard Harvester does not support the Ironic `config-2` label. Use this script to inject a hook into the ISO's `rootfs.squashfs` that bridges `config-2` to Harvester's cloud-init compatibility layer.
+You can customize the build by passing variables to `make`.
 
-**Usage:**
+| Variable | Default | Description |
+| --- | --- | --- |
+| `VERSION` | `v1.7.0` | The Harvester version to download and build. |
+| `PATCH_IRONIC` | `false` | Set to `true` to inject the Ironic compatibility hook. |
+| `FORMAT` | `qcow2` | Output disk format. Options: `qcow2`, `raw-zst`. |
+| `ARCH` | `amd64` | Architecture to build for. |
+| `BOOT_MODE` | `efi` | Boot firmware type (`efi` or `bios`). |
+
+**Example:** Build a specific version for EFI boot:
 
 ```bash
-sudo ./patch_harvester_iso_ironic_hook.sh <input_iso> [output_iso]
-```
-
-**Example:**
-
-```bash
-sudo ./patch_harvester_iso.sh harvester-v1.7.0.iso harvester-ironic.iso
+make VERSION=v1.7.0 BOOT_MODE=efi
 ```
 
 ---
+## 📂 Repository Structure
 
-## 2. Build Raw/QCOW2 Image
-
-Use this if you need a pre-installed disk image instead of an installer ISO (e.g., for direct KVM/QEMU booting).
-
-**Usage:**
-
-```bash
-sudo ./build-raw-image.sh [options]
+```text
+.
+├── Makefile                                # Main orchestrator
+├── download-harvester-artefacts.sh         # Script to fetch ISO/Kernel/Initrd
+├── build-raw-image.sh                      # Script to install Harvester into a QCOW2 image
+└── ironic-patch/
+    └── patch_harvester_iso_ironic_hook.sh  # Script to inject the Ironic/Yip hook
 ```
 
-**Options:**
+### Script Details
 
-* `-b, --boot-mode [efi|bios]`: Set boot firmware (default: `efi`).
-* `-f, --format [raw-zst|qcow2]`: Output format (default: `raw-zst`).
-* `-d, --dir [DIRECTORY]`: Directory containing artifacts (ISO, vmlinuz, initrd).
+* **`download-harvester-artefacts.sh`**: Auto-detects the latest version (or accepts a specific tag) and downloads all required files to a local directory.
+* **`build-raw-image.sh`**: Uses QEMU/KVM to boot the Harvester installer in a headless VM and installs the OS onto a virtual disk file. It supports exporting to `qcow2` or compressed raw (`raw-zst`).
+* **`ironic-patch/...`**: Unpacks the Harvester ISO `rootfs.squashfs`, injects a custom hook into `/system/oem`, and repacks the ISO. This hook allows Harvester to read configuration from OpenStack Ironic `config-2` drives, which are normally ignored by the OS.
 
-**Example:**
-
-```bash
-# Create a EFI-bootable QCOW2 image
-sudo ./build-raw-image.sh -b efi -f qcow2 -d harvester-v1.7.0-artifacts
-```
 ---
 
-## 3. Generate Configuration Drives (for testing)
+## 🧹 Cleanup
 
-These scripts convert a simple YAML Harvester configuration file into a bootable ISO.
-
-### A. For Patched ISOs (Ironic/ConfigDrive)
-
-Use this if you applied the patch in step #2. It creates an ISO with label `config-2` and path `/openstack/latest/user_data`.
+To remove all generated images, staging areas, and downloaded artifacts:
 
 ```bash
-# Usage: ./build-configdrive.sh <config_file> [output_iso]
-./build-configdrive.sh harvester-config.yaml config-drive.iso
+make clean
 ```
 
-### B. For Unmodified ISOs (NoCloud)
-
-Use this for standard Harvester. It creates an ISO with label `CIDATA` and path `/user-data`.
+If you only want to remove the generated images but **keep the downloaded ISOs** (to avoid re-downloading next time), simply delete the `build-staging-*` directory manually or modify the `clean` target in the Makefile.
 
 ```bash
-# Usage: ./build-nocloud.sh <config_file> [output_iso]
-./build-nocloud.sh harvester-config.yaml nocloud.iso
+rm -rf build-staging-*
 ```
