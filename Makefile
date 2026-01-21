@@ -3,25 +3,23 @@
 # ============================================================================
 
 # --- Configuration ---
-# You can override these from the command line: make VERSION=v1.7.0
+# Set to 'true' to inject the Ironic hook.
+# Default is 'false' (Standard Harvester build).
+PATCH_IRONIC ?= false
+
 VERSION    ?= v1.7.0
 ARCH       ?= amd64
 BOOT_MODE  ?= efi
 FORMAT     ?= qcow2
 
 # --- Paths & Directories ---
-# The directory created by the download script
 DOWNLOAD_DIR := harvester-$(VERSION)-artifacts
-
-# A temporary staging directory where we assemble the patched ISO + Kernel
 STAGING_DIR  := build-staging-$(VERSION)
 
-# --- Filenames (Based on Harvester Naming Conventions) ---
+# --- Filenames ---
 ISO_NAME     := harvester-$(VERSION)-$(ARCH).iso
 KERNEL_NAME  := harvester-$(VERSION)-vmlinuz-$(ARCH)
 INITRD_NAME  := harvester-$(VERSION)-initrd-$(ARCH)
-
-# The final output file created by build-raw-image.sh
 FINAL_IMAGE  := $(STAGING_DIR)/harvester-$(VERSION)-$(ARCH).$(FORMAT)
 
 # --- Scripts ---
@@ -29,58 +27,60 @@ SCRIPT_DOWNLOAD := ./download-harvester-artefacts.sh
 SCRIPT_PATCH    := ./ironic-patch/patch_harvester_iso_ironic_hook.sh
 SCRIPT_BUILD    := ./build-raw-image.sh
 
+# --- Prerequisites ---
+REQUIRED_TOOLS := curl xorriso unsquashfs mksquashfs qemu-img qemu-system-x86_64
+
 # ============================================================================
 # Targets
 # ============================================================================
 
-.PHONY: all help clean download patch image
+.PHONY: all help clean download prepare-iso image check-deps
 
-# Default target: Build the final image
-all: image
+all: check-deps image
 	@echo "✅ Build Complete. Final image available at: $(FINAL_IMAGE)"
 
+# 0. Check Prerequisites
+check-deps:
+	@echo "🔍 Checking system prerequisites..."
+	@$(foreach tool,$(REQUIRED_TOOLS),\
+		if ! command -v $(tool) > /dev/null; then \
+			echo "❌ Error: '$(tool)' is missing."; \
+			exit 1; \
+		fi;)
+	@echo "✅ All required tools are installed."
+
 # 1. Download Artifacts
-# Checks if the ISO exists to avoid re-downloading
-download: $(DOWNLOAD_DIR)/$(ISO_NAME)
+download: check-deps $(DOWNLOAD_DIR)/$(ISO_NAME)
 
 $(DOWNLOAD_DIR)/$(ISO_NAME):
 	@echo "📥 Step 1: Downloading Harvester Artifacts ($(VERSION))..."
 	bash $(SCRIPT_DOWNLOAD) $(VERSION)
 
-# 2. Patch ISO & Prepare Staging Area
-# We rely on the download step first.
-# We patch the ISO and save it to STAGING_DIR with the original name.
-# We also copy the kernel and initrd so the build script finds everything in one place.
-patch: $(STAGING_DIR)/$(ISO_NAME)
+# 2. Prepare Staging ISO (Patched OR Original)
+# This target creates the ISO used for building the image.
+prepare-iso: check-deps $(STAGING_DIR)/$(ISO_NAME)
 
 $(STAGING_DIR)/$(ISO_NAME): $(DOWNLOAD_DIR)/$(ISO_NAME)
-	@echo "🔧 Step 2: Preparing Staging Area & Patching ISO..."
+	@echo "🔧 Step 2: Preparing Staging Area..."
 	@mkdir -p $(STAGING_DIR)
 	
-	@# Copy Kernel and Initrd (Required by build-raw-image.sh)
 	@echo "   -> Copying Kernel and Initrd to staging..."
 	@cp $(DOWNLOAD_DIR)/$(KERNEL_NAME) $(STAGING_DIR)/
 	@cp $(DOWNLOAD_DIR)/$(INITRD_NAME) $(STAGING_DIR)/
 	
-	@# Run the Patch Script
-	@# Input: Original ISO | Output: Staging ISO (named same as original)
-	@echo "   -> Injecting Ironic Hook..."
-	@# We use sudo here because xorriso/mounting often requires it, 
-	@# and the script usage suggests it.
-	sudo bash $(SCRIPT_PATCH) \
-		$(DOWNLOAD_DIR)/$(ISO_NAME) \
-		$(STAGING_DIR)/$(ISO_NAME)
+	@if [ "$(PATCH_IRONIC)" = "true" ]; then \
+		echo "   -> 💉 Injecting Ironic Hook (PATCH_IRONIC=true)..."; \
+		sudo bash $(SCRIPT_PATCH) $(DOWNLOAD_DIR)/$(ISO_NAME) $(STAGING_DIR)/$(ISO_NAME); \
+	else \
+		echo "   -> ⚠️  Using Standard ISO (PATCH_IRONIC=false)..."; \
+		cp $(DOWNLOAD_DIR)/$(ISO_NAME) $(STAGING_DIR)/$(ISO_NAME); \
+	fi
 
 # 3. Build QCOW2 Image
-# Points the build script to the STAGING_DIR where the Patched ISO lives.
-image: $(FINAL_IMAGE)
+image: check-deps $(FINAL_IMAGE)
 
 $(FINAL_IMAGE): $(STAGING_DIR)/$(ISO_NAME)
-	@echo "🏗️  Step 3: Building QCOW2 Image (This may take a while)..."
-	@# -v: Version
-	@# -d: Directory (We point to staging so it uses the PATCHED iso)
-	@# -f: Format
-	@# -b: Boot Mode
+	@echo "🏗️  Step 3: Building $(FORMAT) Image..."
 	sudo bash $(SCRIPT_BUILD) \
 		-v $(VERSION) \
 		-d $(STAGING_DIR) \
@@ -97,11 +97,11 @@ help:
 	@echo "Usage: make [target] [variables]"
 	@echo ""
 	@echo "Variables:"
-	@echo "  VERSION    Harvester version to build (default: v1.7.0)"
-	@echo "  FORMAT     Output format: qcow2 or raw-zst (default: qcow2)"
+	@echo "  PATCH_IRONIC  Inject Ironic hook? true/false (default: false)"
+	@echo "  VERSION       Harvester version (default: v1.7.0)"
+	@echo "  FORMAT        Output format: qcow2 or raw-zst (default: qcow2)"
 	@echo ""
-	@echo "Targets:"
-	@echo "  make       Download -> Patch -> Build QCOW2"
-	@echo "  make download  Only download artifacts"
-	@echo "  make patch     Download and Patch ISO (creates staging dir)"
-	@echo "  make clean     Remove all artifacts and build files"
+	@echo "Examples:"
+	@echo "  make                          # Build STANDARD Harvester QCOW2"
+	@echo "  make PATCH_IRONIC=true        # Build PATCHED Harvester QCOW2"
+	@echo "  make clean                    # Remove artifacts"
