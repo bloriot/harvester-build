@@ -53,7 +53,7 @@ You can customize the build by passing variables to `make`.
 **Example:** Build a specific version for EFI boot:
 
 ```bash
-make VERSION=v1.7.0 BOOT_MODE=efi
+make VERSION=v1.7.1 BOOT_MODE=efi
 ```
 
 ---
