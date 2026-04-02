@@ -1,5 +1,5 @@
 # ============================================================================
-# Harvester Ironic Image Builder
+# Harvester Image Builder
 # ============================================================================
 
 # --- Configuration ---
@@ -23,12 +23,14 @@ INITRD_NAME  := harvester-$(VERSION)-initrd-$(ARCH)
 FINAL_IMAGE  := $(STAGING_DIR)/harvester-$(VERSION)-$(ARCH).$(FORMAT)
 
 # --- Scripts ---
-SCRIPT_DOWNLOAD := ./download-harvester-artefacts.sh
-SCRIPT_PATCH    := ./ironic-patch/patch_harvester_iso_ironic_hook.sh
-SCRIPT_BUILD    := ./build-raw-image.sh
+SCRIPT_DOWNLOAD     := ./download-harvester-artefacts.sh
+SCRIPT_PATCH        := ./ironic-patch/patch_harvester_iso_ironic_hook.sh
+SCRIPT_BUILD        := ./build-raw-image.sh
+SCRIPT_PATCH_DEVICE := ./misc/patch_qcow2_remove_install_device.sh
 
 # --- Prerequisites ---
-REQUIRED_TOOLS := curl xorriso unsquashfs mksquashfs qemu-img qemu-system-x86_64
+# Added guestmount to ensure libguestfs-tools is installed
+REQUIRED_TOOLS := curl xorriso unsquashfs mksquashfs qemu-img qemu-system-x86_64 guestmount
 
 # ============================================================================
 # Targets
@@ -76,7 +78,7 @@ $(STAGING_DIR)/$(ISO_NAME): $(DOWNLOAD_DIR)/$(ISO_NAME)
 		cp $(DOWNLOAD_DIR)/$(ISO_NAME) $(STAGING_DIR)/$(ISO_NAME); \
 	fi
 
-# 3. Build QCOW2 Image
+# 3. Build QCOW2 Image & Patch Device
 image: check-deps $(FINAL_IMAGE)
 
 $(FINAL_IMAGE): $(STAGING_DIR)/$(ISO_NAME)
@@ -86,6 +88,13 @@ $(FINAL_IMAGE): $(STAGING_DIR)/$(ISO_NAME)
 		-d $(STAGING_DIR) \
 		-f $(FORMAT) \
 		-b $(BOOT_MODE)
+	@echo "🔧 Step 4: Post-processing image..."
+	@if [ "$(FORMAT)" = "qcow2" ]; then \
+		echo "   -> Removing hardcoded install device from Harvester config..."; \
+		sudo bash $(SCRIPT_PATCH_DEVICE) $(FINAL_IMAGE); \
+	else \
+		echo "   -> ⚠️ Skipping device patch (only supported for qcow2 format)."; \
+	fi
 
 # Utilities
 clean:
