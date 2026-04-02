@@ -33,6 +33,9 @@ install:
   # Run installer  without asking for interactive confirmation.
   automatic: true
 
+  # Device on which the operating system is installed
+  device: /dev/sda
+
   # Defines how this node connects to the network.
   management_interface:
     # The list of physical interfaces to use for the management network.
