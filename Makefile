@@ -7,7 +7,7 @@
 # Default is 'false' (Standard Harvester build).
 PATCH_IRONIC ?= false
 
-VERSION    ?= v1.7.0
+VERSION    ?= v1.7.1
 ARCH       ?= amd64
 BOOT_MODE  ?= efi
 FORMAT     ?= qcow2
@@ -99,7 +99,7 @@ help:
 	@echo ""
 	@echo "Variables:"
 	@echo "  PATCH_IRONIC  Inject Ironic hook? true/false (default: false)"
-	@echo "  VERSION       Harvester version (default: v1.7.0)"
+	@echo "  VERSION       Harvester version (default: v1.7.1)"
 	@echo "  FORMAT        Output format: qcow2 or raw-zst (default: qcow2)"
 	@echo ""
 	@echo "Examples:"
