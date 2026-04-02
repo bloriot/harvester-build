@@ -11,6 +11,12 @@ This repository provides scripts and a Makefile to:
 
 ### 1. Prerequisites
 Ensure you have the required tools installed.
+
+* **SLES/openSUSE:**
+    ```bash
+    sudo zypper install curl xorriso squashfs qemu-img qemu-x86 ovmf make
+    ```
+
 * **Debian/Ubuntu:**
     ```bash
     sudo apt update
