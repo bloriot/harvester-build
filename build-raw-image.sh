@@ -211,7 +211,7 @@ QEMU_CMD="$QEMU_CMD -cdrom ${ISO_FILE} -kernel ${KERNEL_FILE}"
 
 # Using CDLABEL=COS_LIVE to ensure the ISO is found regardless of the boot device name
 # NOTE: rd.live.squashimg=rootfs.squashfs directs it to look for the squashfs file inside the ISO
-CMDLINE="cdroot root=live:CDLABEL=COS_LIVE rd.live.dir=/ rd.live.squashimg=rootfs.squashfs console=ttyS1 rd.cos.disable net.ifnames=1 harvester.install.mode=install harvester.install.device=/dev/vda harvester.install.automatic=true harvester.install.powerOff=true harvester.os.password=rancher harvester.scheme_version=1 harvester.install.persistentPartitionSize=150Gi harvester.install.skipchecks=true"
+CMDLINE="cdroot root=live:CDLABEL=COS_LIVE rd.live.dir=/ rd.live.squashimg=rootfs.squashfs console=ttyS1 rd.cos.disable net.ifnames=1 harvester.install.mode=install harvester.install.device=/dev/vda harvester.install.automatic=true harvester.install.powerOff=true harvester.os.password=rancher harvester.scheme_version=1 harvester.install.skipchecks=true"
 
 QEMU_CMD="$QEMU_CMD -append \"$CMDLINE\" -initrd ${INITRD_FILE} -boot once=d"
 
