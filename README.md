@@ -62,6 +62,7 @@ You can customize the build by passing variables to `make`.
 | `MEMORY` | `8192` (`4096` if the host has less than 8.5 GB RAM) | Memory of the installer VM, in MB. |
 | `DISK_SIZE` | `250G` | Virtual size of the target disk (qemu-img format, e.g. `200G`). |
 | `LOG_DIR` | `logs` | Directory where each installation log is written. |
+| `INSTALL_TIMEOUT` | `3600` | Maximum installation duration in seconds (60 min). The build fails if the installer VM has not powered off by then. |
 
 When `CPUS`, `MEMORY` or `DISK_SIZE` are not set, the defaults above are used.
 

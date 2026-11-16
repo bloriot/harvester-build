@@ -17,6 +17,7 @@ CPUS       ?=
 MEMORY     ?=
 DISK_SIZE  ?=
 LOG_DIR    ?= logs
+INSTALL_TIMEOUT ?= 3600
 
 # --- Paths & Directories ---
 DOWNLOAD_DIR := harvester-$(VERSION)-artifacts
@@ -97,6 +98,7 @@ $(FINAL_IMAGE): $(STAGING_DIR)/$(ISO_NAME)
 		-f $(FORMAT) \
 		-b $(BOOT_MODE) \
 		-l $(LOG_DIR) \
+		-t $(INSTALL_TIMEOUT) \
 		$(if $(CPUS),-c $(CPUS)) \
 		$(if $(MEMORY),-m $(MEMORY)) \
 		$(if $(DISK_SIZE),-s $(DISK_SIZE))
@@ -127,6 +129,7 @@ help:
 	@echo "  MEMORY        Installer VM memory in MB (default: 8192, or 4096 if host RAM < 8.5 GB)"
 	@echo "  DISK_SIZE     Virtual disk size, e.g. 250G (default: 250G)"
 	@echo "  LOG_DIR       Directory for installer logs (default: logs)"
+	@echo "  INSTALL_TIMEOUT  Max installation duration in seconds (default: 3600)"
 	@echo ""
 	@echo "Examples:"
 	@echo "  make                          # Build STANDARD Harvester QCOW2"
