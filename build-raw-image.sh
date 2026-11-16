@@ -19,6 +19,7 @@ CPUS=""                 # Empty = default topology (2 cores x 2 threads)
 MEMORY=""               # Empty = 8192 MB, or 4096 MB on hosts with < 8.5 GB RAM
 DISK_SIZE="250G"        # Virtual disk size (qemu-img format)
 LOG_DIR="logs"          # Directory for per-build installer logs
+INSTALL_TIMEOUT=3600    # Max seconds for the installer VM to power off (default: 60 min)
 
 # Default Settings (can be overridden by flags)
 BOOT_MODE="efi"         # Options: efi, bios
@@ -43,6 +44,7 @@ usage() {
     echo "  -m, --memory [MB]            VM memory in MB (default: 8192, or 4096 on hosts with < 8.5 GB RAM)"
     echo "  -s, --disk-size [SIZE]       Virtual disk size, e.g. 250G (default: 250G)"
     echo "  -l, --log-dir [DIRECTORY]    Directory for installer logs (default: logs)"
+    echo "  -t, --install-timeout [SEC]  Max installation duration in seconds (default: 3600)"
     echo "  -h, --help                   Show this help message"
     exit 0
 }
@@ -75,6 +77,7 @@ while [[ "$#" -gt 0 ]]; do
         -m|--memory) MEMORY="$2"; shift ;;
         -s|--disk-size) DISK_SIZE="$2"; shift ;;
         -l|--log-dir) LOG_DIR="$2"; shift ;;
+        -t|--install-timeout) INSTALL_TIMEOUT="$2"; shift ;;
         -h|--help) usage ;;
         *) echo "Unknown parameter passed: $1"; usage ;;
     esac
@@ -100,6 +103,10 @@ fi
 
 if ! [[ "$DISK_SIZE" =~ ^[1-9][0-9]*[KMGT]?$ ]]; then
     error "Invalid disk size: $DISK_SIZE. Use a number with an optional K, M, G or T suffix (e.g. 250G)."
+fi
+
+if ! [[ "$INSTALL_TIMEOUT" =~ ^[1-9][0-9]*$ ]]; then
+    error "Invalid install timeout: $INSTALL_TIMEOUT. Use a positive number of seconds."
 fi
 
 # Remove trailing slash from ARTIFACTS_DIR if present
@@ -262,8 +269,21 @@ CMDLINE="cdroot root=live:CDLABEL=COS_LIVE rd.live.dir=/ rd.live.squashimg=rootf
 
 QEMU_CMD+=(-append "$CMDLINE" -initrd "${INITRD_FILE}" -boot once=d)
 
-echo "  Running installation (Check ${INSTALL_LOG} for details)..."
-"${QEMU_CMD[@]}"
+echo "  Running installation (timeout: ${INSTALL_TIMEOUT}s, check ${INSTALL_LOG} for details)..."
+set +e
+timeout --foreground -k 30 "$INSTALL_TIMEOUT" "${QEMU_CMD[@]}"
+QEMU_RC=$?
+set -e
+
+if [ "$QEMU_RC" -eq 124 ] || [ "$QEMU_RC" -eq 137 ]; then
+    rm -f "$RAW_FILE"
+    restore_owner "$INSTALL_LOG"
+    error "Installation did not power off within ${INSTALL_TIMEOUT}s and was stopped (see ${INSTALL_LOG})."
+elif [ "$QEMU_RC" -ne 0 ]; then
+    rm -f "$RAW_FILE"
+    restore_owner "$INSTALL_LOG"
+    error "Installer VM exited with code ${QEMU_RC} (see ${INSTALL_LOG})."
+fi
 
 # ============================================================================
 # Step 5: Post-Processing (Compress or Convert)
