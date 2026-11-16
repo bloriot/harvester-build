@@ -145,6 +145,12 @@ install_debian_deps() {
 _configure_docker_daemon() {
     log "Configuring /etc/docker/daemon.json for API compatibility..."
     mkdir -p /etc/docker
+    # Keep any existing daemon.json so a user's settings are not lost
+    if [ -f /etc/docker/daemon.json ]; then
+        local backup="/etc/docker/daemon.json.bak.$(date +%Y%m%d%H%M%S)"
+        warn "Existing /etc/docker/daemon.json backed up to $backup"
+        cp /etc/docker/daemon.json "$backup"
+    fi
     tee /etc/docker/daemon.json <<EOF
 {
   "min-api-version": "1.42"
@@ -204,15 +210,14 @@ perform_build() {
     # Execute the Make command
     log "Starting Build Process..."
     
+    # BUILD_QCOW is exported so the harvester-installer Makefile sees it
+    export BUILD_QCOW
     if [ "$BUILD_QCOW" == "true" ]; then
         log "Building Raw QCOW Image (KVM required)..."
-        # Setting the variable explicitly for the make command
-        export BUILD_QCOW=true
-        make
     else
         log "Building Standard ISO Image..."
-        make
     fi
+    make
     
     log "Build Process Complete!"
     log "Artifacts are located in: $WORK_DIR/harvester-installer/dist/artifacts"

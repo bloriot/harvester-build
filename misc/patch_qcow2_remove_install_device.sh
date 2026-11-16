@@ -29,7 +29,7 @@ IMG_MOUNT="mnt_oem"
 cleanup() {
     echo "🧹 Cleaning up..."
     if mountpoint -q "$IMG_MOUNT"; then
-        sudo guestunmount "$IMG_MOUNT"
+        guestunmount "$IMG_MOUNT"
     fi
     [ -d "$IMG_MOUNT" ] && rmdir "$IMG_MOUNT"
 }
@@ -39,7 +39,7 @@ echo "🔧 Processing Image: $QCOW_IMAGE"
 
 # 3. Mount the OEM Partition directly (/dev/sda2)
 echo "📂 Mounting OEM partition (/dev/sda2)..."
-sudo guestmount -a "$QCOW_IMAGE" -m /dev/sda2 --rw "$IMG_MOUNT"
+guestmount -a "$QCOW_IMAGE" -m /dev/sda2 --rw "$IMG_MOUNT"
 
 # 4. Apply the Patch
 TARGET_FILE="$IMG_MOUNT/harvester.config"
@@ -58,7 +58,7 @@ grep "device:" "$TARGET_FILE" || echo "      (No 'device:' line found)"
 # Run sed to delete the device line
 # /^[[:space:]]*device:/ matches 'device:' with any leading spaces
 # d deletes the matched line
-sudo sed -i '/^[[:space:]]*device:/d' "$TARGET_FILE"
+sed -i '/^[[:space:]]*device:/d' "$TARGET_FILE"
 
 # Show after
 echo "   ✅ After patch (verifying removal):"
@@ -66,6 +66,11 @@ grep "device:" "$TARGET_FILE" || echo "      (Line successfully removed!)"
 
 # 5. Unmount
 echo "🔒 Unmounting image..."
-sudo guestunmount "$IMG_MOUNT"
+guestunmount "$IMG_MOUNT"
 
 echo "🎉 Success! The hardcoded device has been removed from the image."
+
+# Run under sudo (guestmount needs root to read the host kernel): give the image back to the invoking user
+if [ -n "$SUDO_UID" ]; then
+    chown "$SUDO_UID:$SUDO_GID" "$QCOW_IMAGE"
+fi

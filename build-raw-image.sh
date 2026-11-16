@@ -47,6 +47,13 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# Under sudo, hand generated files back to the invoking user instead of root
+restore_owner() {
+    if [ -n "$SUDO_UID" ]; then
+        chown "$SUDO_UID:$SUDO_GID" "$@"
+    fi
+}
+
 # ============================================================================
 # Step 0: Argument Parsing
 # ============================================================================
@@ -236,6 +243,7 @@ if [[ "$OUTPUT_FORMAT" == "qcow2" ]]; then
     echo "  Removing intermediate raw file..."
     rm -f "$RAW_FILE"
     echo "  ✅ Done: $QCOW_FILE"
+    restore_owner "$QCOW_FILE" harvester-installer.log
 
 elif [[ "$OUTPUT_FORMAT" == "raw-zst" ]]; then
     COMPRESSED_FILE="${RAW_FILE}.zst"
@@ -244,6 +252,7 @@ elif [[ "$OUTPUT_FORMAT" == "raw-zst" ]]; then
     if [ -f "$COMPRESSED_FILE" ]; then rm -f "$COMPRESSED_FILE"; fi
     zstd -T4 --rm "$RAW_FILE"
     echo "  ✅ Done: $COMPRESSED_FILE"
+    restore_owner "$COMPRESSED_FILE" harvester-installer.log
 fi
 
 log "Build completed successfully!"
