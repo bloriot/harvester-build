@@ -37,9 +37,15 @@ trap cleanup EXIT
 
 echo "🔧 Processing Image: $QCOW_IMAGE"
 
-# 3. Mount the OEM Partition directly (/dev/sda2)
-echo "📂 Mounting OEM partition (/dev/sda2)..."
-guestmount -a "$QCOW_IMAGE" -m /dev/sda2 --rw "$IMG_MOUNT"
+# 3. Locate the OEM partition by its filesystem label, then mount it
+echo "📂 Locating OEM partition (label COS_OEM)..."
+OEM_DEV=$(guestfish --ro -a "$QCOW_IMAGE" run : findfs-label COS_OEM)
+if [ -z "$OEM_DEV" ]; then
+    echo "❌ Error: no partition labelled COS_OEM found in '$QCOW_IMAGE'!"
+    exit 1
+fi
+echo "📂 Mounting OEM partition ($OEM_DEV)..."
+guestmount -a "$QCOW_IMAGE" -m "$OEM_DEV" --rw "$IMG_MOUNT"
 
 # 4. Apply the Patch
 TARGET_FILE="$IMG_MOUNT/harvester.config"

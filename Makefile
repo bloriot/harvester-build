@@ -12,6 +12,12 @@ ARCH       ?= amd64
 BOOT_MODE  ?= efi
 FORMAT     ?= qcow2
 
+# Optional VM overrides for the installer (empty = build-raw-image.sh defaults)
+CPUS       ?=
+MEMORY     ?=
+DISK_SIZE  ?=
+LOG_DIR    ?= logs
+
 # --- Paths & Directories ---
 DOWNLOAD_DIR := harvester-$(VERSION)-artifacts
 STAGING_DIR  := build-staging-$(VERSION)
@@ -89,7 +95,11 @@ $(FINAL_IMAGE): $(STAGING_DIR)/$(ISO_NAME)
 		-v $(VERSION) \
 		-d $(STAGING_DIR) \
 		-f $(FORMAT) \
-		-b $(BOOT_MODE)
+		-b $(BOOT_MODE) \
+		-l $(LOG_DIR) \
+		$(if $(CPUS),-c $(CPUS)) \
+		$(if $(MEMORY),-m $(MEMORY)) \
+		$(if $(DISK_SIZE),-s $(DISK_SIZE))
 	@echo "🔧 Step 4: Post-processing image..."
 	@if [ "$(FORMAT)" = "qcow2" ]; then \
 		echo "   -> Removing hardcoded install device from Harvester config..."; \
@@ -104,6 +114,7 @@ clean:
 	rm -rf $(STAGING_DIR)
 	rm -rf $(DOWNLOAD_DIR)
 	rm -rf harvester-installer.log
+	rm -rf $(LOG_DIR)
 
 help:
 	@echo "Usage: make [target] [variables]"
@@ -112,6 +123,10 @@ help:
 	@echo "  PATCH_IRONIC  Inject Ironic hook? true/false (default: false)"
 	@echo "  VERSION       Harvester version (default: v1.9.1)"
 	@echo "  FORMAT        Output format: qcow2 or raw-zst (default: qcow2)"
+	@echo "  CPUS          Installer VM vCPU count (default: 2 cores x 2 threads)"
+	@echo "  MEMORY        Installer VM memory in MB (default: 8192, or 4096 if host RAM < 8.5 GB)"
+	@echo "  DISK_SIZE     Virtual disk size, e.g. 250G (default: 250G)"
+	@echo "  LOG_DIR       Directory for installer logs (default: logs)"
 	@echo ""
 	@echo "Examples:"
 	@echo "  make                          # Build STANDARD Harvester QCOW2"

@@ -15,6 +15,10 @@ PROJECT_PREFIX="harvester"
 ARCH="amd64"
 ARTIFACTS_DIR="harvester-build/harvester-installer/dist/artifacts" # Default path
 VM_MEMORY=8192
+CPUS=""                 # Empty = default topology (2 cores x 2 threads)
+MEMORY=""               # Empty = 8192 MB, or 4096 MB on hosts with < 8.5 GB RAM
+DISK_SIZE="250G"        # Virtual disk size (qemu-img format)
+LOG_DIR="logs"          # Directory for per-build installer logs
 
 # Default Settings (can be overridden by flags)
 BOOT_MODE="efi"         # Options: efi, bios
@@ -35,6 +39,10 @@ usage() {
     echo "  -f, --format [raw-zst|qcow2] Set output format (default: raw-zst)"
     echo "  -v, --version [VERSION]      Set specific version (auto-detected if empty)"
     echo "  -d, --dir [DIRECTORY]        Set artifacts directory"
+    echo "  -c, --cpus [N]               Number of vCPUs (default: 2 cores x 2 threads)"
+    echo "  -m, --memory [MB]            VM memory in MB (default: 8192, or 4096 on hosts with < 8.5 GB RAM)"
+    echo "  -s, --disk-size [SIZE]       Virtual disk size, e.g. 250G (default: 250G)"
+    echo "  -l, --log-dir [DIRECTORY]    Directory for installer logs (default: logs)"
     echo "  -h, --help                   Show this help message"
     exit 0
 }
@@ -63,6 +71,10 @@ while [[ "$#" -gt 0 ]]; do
         -f|--format) OUTPUT_FORMAT="$2"; shift ;;
         -v|--version) VERSION="$2"; shift ;;
         -d|--dir) ARTIFACTS_DIR="$2"; shift ;;
+        -c|--cpus) CPUS="$2"; shift ;;
+        -m|--memory) MEMORY="$2"; shift ;;
+        -s|--disk-size) DISK_SIZE="$2"; shift ;;
+        -l|--log-dir) LOG_DIR="$2"; shift ;;
         -h|--help) usage ;;
         *) echo "Unknown parameter passed: $1"; usage ;;
     esac
@@ -76,6 +88,18 @@ fi
 
 if [[ "$OUTPUT_FORMAT" != "raw-zst" && "$OUTPUT_FORMAT" != "qcow2" ]]; then
     error "Invalid format: $OUTPUT_FORMAT. Use 'raw-zst' or 'qcow2'."
+fi
+
+if [ -n "$CPUS" ] && ! [[ "$CPUS" =~ ^[1-9][0-9]*$ ]]; then
+    error "Invalid CPU count: $CPUS. Use a positive integer."
+fi
+
+if [ -n "$MEMORY" ] && ! [[ "$MEMORY" =~ ^[1-9][0-9]*$ ]]; then
+    error "Invalid memory: $MEMORY. Use a positive number of MB."
+fi
+
+if ! [[ "$DISK_SIZE" =~ ^[1-9][0-9]*[KMGT]?$ ]]; then
+    error "Invalid disk size: $DISK_SIZE. Use a number with an optional K, M, G or T suffix (e.g. 250G)."
 fi
 
 # Remove trailing slash from ARTIFACTS_DIR if present
@@ -191,21 +215,37 @@ RAW_FILE="${ARTIFACTS_DIR}/${PROJECT_PREFIX}-${ARCH}.raw"
 if [ -f "$RAW_FILE" ]; then rm -f "$RAW_FILE"; fi
 
 # Create sparse file
-qemu-img create -f raw -o size=250G "$RAW_FILE"
+qemu-img create -f raw -o size="$DISK_SIZE" "$RAW_FILE"
 
-HOST_RAM_KB=$(grep MemTotal /proc/meminfo | awk '{print $2}')
-if [ "$HOST_RAM_KB" -lt 8500000 ]; then VM_MEMORY=4096; fi
+# Per-build installer log, kept in LOG_DIR
+mkdir -p "$LOG_DIR"
+restore_owner "$LOG_DIR"
+INSTALL_LOG="${LOG_DIR}/install-${PROJECT_PREFIX}-$(date +%Y%m%d-%H%M%S).log"
 
-QEMU_CMD="qemu-system-x86_64 -machine q35,accel=kvm -cpu host -smp cores=2,threads=2,sockets=1 -m ${VM_MEMORY}"
-QEMU_CMD="$QEMU_CMD -nographic -serial mon:stdio -serial file:harvester-installer.log -nic none"
+if [ -n "$MEMORY" ]; then
+    VM_MEMORY="$MEMORY"
+else
+    HOST_RAM_KB=$(grep MemTotal /proc/meminfo | awk '{print $2}')
+    if [ "$HOST_RAM_KB" -lt 8500000 ]; then VM_MEMORY=4096; fi
+fi
+
+if [ -n "$CPUS" ]; then
+    SMP_ARG="$CPUS"
+else
+    SMP_ARG="cores=2,threads=2,sockets=1"
+fi
+
+# Built as an array so each argument reaches QEMU unchanged (no eval)
+QEMU_CMD=(qemu-system-x86_64 -machine q35,accel=kvm -cpu host -smp "$SMP_ARG" -m "$VM_MEMORY")
+QEMU_CMD+=(-nographic -serial mon:stdio -serial "file:$INSTALL_LOG" -nic none)
 
 # Firmware Selection
 if [[ "$BOOT_MODE" == "efi" ]]; then
     if [ "$USE_SEPARATE_VARS" = true ]; then
-        QEMU_CMD="$QEMU_CMD -drive if=pflash,format=raw,readonly=on,file=${OVMF_CODE}"
-        QEMU_CMD="$QEMU_CMD -drive if=pflash,format=raw,file=${TEMP_OVMF_VARS}"
+        QEMU_CMD+=(-drive "if=pflash,format=raw,readonly=on,file=${OVMF_CODE}")
+        QEMU_CMD+=(-drive "if=pflash,format=raw,file=${TEMP_OVMF_VARS}")
     else
-        QEMU_CMD="$QEMU_CMD -bios ${OVMF_CODE}"
+        QEMU_CMD+=(-bios "${OVMF_CODE}")
     fi
 else
     # BIOS Mode: No specific flags needed for default SeaBIOS
@@ -213,17 +253,17 @@ else
 fi
 
 # Storage & Kernel
-QEMU_CMD="$QEMU_CMD -drive file=${RAW_FILE},if=virtio,cache=writeback,discard=ignore,format=raw"
-QEMU_CMD="$QEMU_CMD -cdrom ${ISO_FILE} -kernel ${KERNEL_FILE}"
+QEMU_CMD+=(-drive "file=${RAW_FILE},if=virtio,cache=writeback,discard=ignore,format=raw")
+QEMU_CMD+=(-cdrom "${ISO_FILE}" -kernel "${KERNEL_FILE}")
 
 # Using CDLABEL=COS_LIVE to ensure the ISO is found regardless of the boot device name
 # NOTE: rd.live.squashimg=rootfs.squashfs directs it to look for the squashfs file inside the ISO
 CMDLINE="cdroot root=live:CDLABEL=COS_LIVE rd.live.dir=/ rd.live.squashimg=rootfs.squashfs console=ttyS1 rd.cos.disable net.ifnames=1 harvester.install.mode=install harvester.install.device=/dev/vda harvester.install.automatic=true harvester.install.powerOff=true harvester.os.password=rancher harvester.scheme_version=1 harvester.install.skipchecks=true"
 
-QEMU_CMD="$QEMU_CMD -append \"$CMDLINE\" -initrd ${INITRD_FILE} -boot once=d"
+QEMU_CMD+=(-append "$CMDLINE" -initrd "${INITRD_FILE}" -boot once=d)
 
-echo "  Running installation (Check harvester-installer.log for details)..."
-eval $QEMU_CMD
+echo "  Running installation (Check ${INSTALL_LOG} for details)..."
+"${QEMU_CMD[@]}"
 
 # ============================================================================
 # Step 5: Post-Processing (Compress or Convert)
@@ -243,7 +283,7 @@ if [[ "$OUTPUT_FORMAT" == "qcow2" ]]; then
     echo "  Removing intermediate raw file..."
     rm -f "$RAW_FILE"
     echo "  ✅ Done: $QCOW_FILE"
-    restore_owner "$QCOW_FILE" harvester-installer.log
+    restore_owner "$QCOW_FILE" "$INSTALL_LOG"
 
 elif [[ "$OUTPUT_FORMAT" == "raw-zst" ]]; then
     COMPRESSED_FILE="${RAW_FILE}.zst"
@@ -252,7 +292,7 @@ elif [[ "$OUTPUT_FORMAT" == "raw-zst" ]]; then
     if [ -f "$COMPRESSED_FILE" ]; then rm -f "$COMPRESSED_FILE"; fi
     zstd -T4 --rm "$RAW_FILE"
     echo "  ✅ Done: $COMPRESSED_FILE"
-    restore_owner "$COMPRESSED_FILE" harvester-installer.log
+    restore_owner "$COMPRESSED_FILE" "$INSTALL_LOG"
 fi
 
 log "Build completed successfully!"
