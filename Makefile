@@ -7,7 +7,7 @@
 # Default is 'false' (Standard Harvester build).
 PATCH_IRONIC ?= false
 
-VERSION    ?= v1.7.1
+VERSION    ?= v1.9.1
 ARCH       ?= amd64
 BOOT_MODE  ?= efi
 FORMAT     ?= qcow2
@@ -20,7 +20,9 @@ STAGING_DIR  := build-staging-$(VERSION)
 ISO_NAME     := harvester-$(VERSION)-$(ARCH).iso
 KERNEL_NAME  := harvester-$(VERSION)-vmlinuz-$(ARCH)
 INITRD_NAME  := harvester-$(VERSION)-initrd-$(ARCH)
-FINAL_IMAGE  := $(STAGING_DIR)/harvester-$(VERSION)-$(ARCH).$(FORMAT)
+# raw-zst is produced by build-raw-image.sh as "<name>.raw.zst"
+FINAL_EXT    := $(if $(filter raw-zst,$(FORMAT)),raw.zst,$(FORMAT))
+FINAL_IMAGE  := $(STAGING_DIR)/harvester-$(VERSION)-$(ARCH).$(FINAL_EXT)
 
 # --- Scripts ---
 SCRIPT_DOWNLOAD     := ./download-harvester-artefacts.sh
@@ -108,7 +110,7 @@ help:
 	@echo ""
 	@echo "Variables:"
 	@echo "  PATCH_IRONIC  Inject Ironic hook? true/false (default: false)"
-	@echo "  VERSION       Harvester version (default: v1.7.1)"
+	@echo "  VERSION       Harvester version (default: v1.9.1)"
 	@echo "  FORMAT        Output format: qcow2 or raw-zst (default: qcow2)"
 	@echo ""
 	@echo "Examples:"

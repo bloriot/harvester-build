@@ -58,6 +58,7 @@ FILES=(
 )
 
 # 3. Loop through files and download
+FAILED=0
 for FILE in "${FILES[@]}"; do
     FILE_URL="$BASE_URL/$VERSION/$FILE"
     
@@ -69,8 +70,28 @@ for FILE in "${FILES[@]}"; do
     else
         echo "   [ERROR] Failed to download $FILE."
         echo "           URL was: $FILE_URL"
+        rm -f "$FILE"
+        FAILED=1
     fi
 done
 
+# 4. Verify the ISO against the published SHA512 checksum
+ISO_FILE="harvester-$VERSION-amd64.iso"
+SHA_FILE="harvester-$VERSION-amd64.sha512"
+if [ "$FAILED" -eq 0 ]; then
+    echo "🔐 Verifying $ISO_FILE checksum..."
+    if grep " $ISO_FILE\$" "$SHA_FILE" | sha512sum -c -; then
+        echo "   [OK] Checksum valid"
+    else
+        echo "   [ERROR] Checksum mismatch for $ISO_FILE"
+        rm -f "$ISO_FILE"
+        FAILED=1
+    fi
+fi
+
 echo "----------------------------------------"
+if [ "$FAILED" -ne 0 ]; then
+    echo "❌ One or more artifacts failed."
+    exit 1
+fi
 echo "🎉 All tasks finished."

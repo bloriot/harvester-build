@@ -14,11 +14,20 @@ if [ -z "$INPUT_ISO" ]; then
     exit 1
 fi
 
+# Never leave a partial ISO behind if the patch fails
+on_exit() {
+    if [ $? -ne 0 ]; then rm -f "$OUTPUT_ISO"; fi
+}
+trap on_exit EXIT
+
 echo "🔧 Processing: $INPUT_ISO"
 
 # 1. Extract rootfs.squashfs
 echo "📦 Extracting rootfs.squashfs..."
-xorriso -osirrox on -indev "$INPUT_ISO" -extract /rootfs.squashfs original_rootfs.squashfs 2>/dev/null
+if ! xorriso -osirrox on -indev "$INPUT_ISO" -extract /rootfs.squashfs original_rootfs.squashfs; then
+    echo "❌ Error: xorriso failed to read $INPUT_ISO."
+    exit 1
+fi
 
 if [ ! -f "original_rootfs.squashfs" ]; then
     echo "❌ Error: Failed to extract /rootfs.squashfs. Please check the ISO path."
@@ -84,10 +93,17 @@ xorriso -indev "$INPUT_ISO" \
         -boot_image any replay \
         -map modified_rootfs.squashfs /rootfs.squashfs \
         -padding 0 \
-        -compliance no_emul_toc \
-        2>/dev/null
-
+        -compliance no_emul_toc
+if [ ! -s "$OUTPUT_ISO" ]; then
+    echo "❌ Error: patched ISO was not created: $OUTPUT_ISO"
+    exit 1
+fi
 echo "🎉 Success! Patched ISO created at: $OUTPUT_ISO"
 
 # Cleanup
 rm -rf squashfs-root original_rootfs.squashfs modified_rootfs.squashfs
+
+# Run under sudo: give the patched ISO back to the invoking user
+if [ -n "$SUDO_UID" ]; then
+    chown "$SUDO_UID:$SUDO_GID" "$OUTPUT_ISO"
+fi
