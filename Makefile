@@ -49,6 +49,7 @@ REQUIRED_TOOLS := curl xorriso unsquashfs mksquashfs qemu-img qemu-system-x86_64
 
 all: check-deps image
 	@echo "✅ Build Complete. Final image available at: $(FINAL_IMAGE)"
+	@echo "   Checksum: $(FINAL_IMAGE).sha512"
 
 # 0. Check Prerequisites
 check-deps:
@@ -88,7 +89,14 @@ $(STAGING_DIR)/$(ISO_NAME): $(DOWNLOAD_DIR)/$(ISO_NAME)
 	fi
 
 # 3. Build QCOW2 Image & Patch Device
-image: check-deps $(FINAL_IMAGE)
+image: check-deps $(FINAL_IMAGE) $(FINAL_IMAGE).sha512
+
+# 5. Checksum manifest, computed after post-processing (the patch changes the image).
+# Verify with: cd $(STAGING_DIR) && sha512sum -c <image>.sha512
+$(FINAL_IMAGE).sha512: $(FINAL_IMAGE)
+	@echo "🔐 Step 5: Generating SHA512 checksum..."
+	@cd $(STAGING_DIR) && sha512sum $(notdir $(FINAL_IMAGE)) > $(notdir $(FINAL_IMAGE)).sha512
+	@echo "   -> $(FINAL_IMAGE).sha512"
 
 $(FINAL_IMAGE): $(STAGING_DIR)/$(ISO_NAME)
 	@echo "🏗️  Step 3: Building $(FORMAT) Image..."
