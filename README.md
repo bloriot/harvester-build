@@ -76,6 +76,14 @@ make VERSION=v1.9.1 BOOT_MODE=bios
 
 Each build writes its installer log to `logs/install-<version>-<timestamp>.log`.
 
+### Checksum
+
+Each build also writes a SHA512 manifest next to the image, for example `build-staging-v1.9.1/harvester-v1.9.1-amd64.qcow2.sha512`. It is computed after post-processing, so it matches the final image. To verify it:
+
+```bash
+cd build-staging-v1.9.1 && sha512sum -c harvester-v1.9.1-amd64.qcow2.sha512
+```
+
 ---
 
 ## 🛠️ Alternative: build from source
